@@ -1,0 +1,64 @@
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+#excel-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    overflow: hidden;
+}
+
+#excel-canvas {
+    background: #fff;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+#cell-editor {
+
+    position: absolute;
+    z-index: 10;
+    font-size: 14px;
+    border: 1px solid #227447;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    background: #fff;
+}
+
+#h-scrollbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 16px;
+    background: #f3f3f3;
+    border-top: 1px solid #ccc;
+    z-index: 20;
+    user-select: none;
+}
+
+#h-thumb {
+    position: absolute;
+    top: 2px;
+    height: 12px;
+    background: #bbb;
+    border-radius: 6px;
+    cursor: pointer;
+    min-width: 30px;
+}
