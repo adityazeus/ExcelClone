@@ -1,80 +1,44 @@
-class GridData {
-  constructor(rows, cols) {
-    this.rows = rows;
-    this.cols = cols;
-    this.data = new Map(); // key: "r,c", value: cell value
-  }
-  getCell(r, c) {
-    return this.data.get(`${r},${c}`) || '';
-  }
-  setCell(r, c, value) {
-    if (value) this.data.set(`${r},${c}`, value);
-    else this.data.delete(`${r},${c}`);
-  }
-}
-
-class GridCell {
-  constructor(row, col, value = '') {
-    this.row = row;
-    this.col = col;
-    this.value = value;
-  }
-
-}
-
-class GridSelection {
-  constructor() {
-    this.row = -1;
-    this.col = -1;
-    this.selectedRow = null; // Add this
-    this.selectedCol = null; // Add this
-  }
-  set(row, col) {
-    this.row = row;
-    this.col = col;
-    this.selectedRow = null;
-    this.selectedCol = null;
-  }
-  selectRow(row) {
-    this.selectedRow = row;
-    this.selectedCol = null;
-    this.row = -1;
-    this.col = -1;
-  }
-  selectCol(col) {
-    this.selectedCol = col;
-    this.selectedRow = null;
-    this.row = -1;
-    this.col = -1;
-  }
-}
-
-class GridRange {
-  constructor() {
-    this.start = null;
-    this.end = null;
-  }
-  set(start, end) {
-    this.start = start;
-    this.end = end;
-  }
-}
-
 class GridRenderer {
+  /**
+   * Initializes the GridRenderer object.
+   * @param {HTMLCanvasElement} canvas The canvas element to render on.
+   * @param {GridData} grid The grid data object.
+   * @param {GridSelection} selection The selection state object.
+   * @param {number} cellWidth The width of each cell.
+   * @param {number} cellHeight The height of each cell.
+   * @param {number} rowHeader The width of the row header.
+   * @param {number} colHeader The height of the column header.
+   * @param {Function} onScroll Callback for scroll events.
+   * @param {GridCell} gridCell The grid cell object.
+   */
   constructor(canvas, grid, selection, cellWidth, cellHeight, rowHeader, colHeader, onScroll, gridCell) {
+    /** @type {HTMLCanvasElement} The canvas element for rendering. */
     this.canvas = canvas;
+    /** @type {CanvasRenderingContext2D} The 2D rendering context. */
     this.ctx = canvas.getContext('2d');
+    /** @type {GridData} The grid data object. */
     this.grid = grid;
+    /** @type {GridCell} The grid cell object. */
     this.gridCell = gridCell;
+    /** @type {GridSelection} The selection state object. */
     this.selection = selection;
+    /** @type {number} The width of each cell. */
     this.cellWidth = cellWidth;
+    /** @type {number} The height of each cell. */
     this.cellHeight = cellHeight;
+    /** @type {number} The width of the row header. */
     this.rowHeader = rowHeader;
+    /** @type {number} The height of the column header. */
     this.colHeader = colHeader;
+    /** @type {number} The current horizontal scroll offset. */
     this.scrollX = 0;
+    /** @type {number} The current vertical scroll offset. */
     this.scrollY = 0;
+    /** @type {number} The number of visible rows. */
     this.visibleRows = 0;
+    /** @type {number} The number of visible columns. */
     this.visibleCols = 0;
+    /** @type {Function} Callback for scroll events. */
     this.onScroll = onScroll;
     this.attachScroll();
     this.resize();
@@ -82,6 +46,9 @@ class GridRenderer {
     this.initScrollbar();
   }
 
+  /**
+   * Resizes the canvas and updates visible rows/columns.
+   */
   resize() {
     let dpr = window.devicePixelRatio || 1;
     this.canvas.width = window.innerWidth*dpr;
@@ -93,6 +60,9 @@ class GridRenderer {
     this.render();
   }
 
+  /**
+   * Attaches scroll event listeners to the canvas.
+   */
   attachScroll() {
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -111,19 +81,36 @@ class GridRenderer {
     });
   }
 
+  /**
+   * Calculates the maximum horizontal scroll value.
+   * @returns {number} The maximum horizontal scroll offset.
+   */
   maxScrollX() {
     return Math.max(0, this.grid.cols * this.cellWidth - (this.canvas.width - this.rowHeader));
   }
+
+  /**
+   * Calculates the maximum vertical scroll value.
+   * @returns {number} The maximum vertical scroll offset.
+   */
   maxScrollY() {
     return Math.max(0, this.grid.rows * this.cellHeight - (this.canvas.height - this.colHeader - 16));
   }
 
   // --- Horizontal Scrollbar ---
+  /**
+   * Initializes the horizontal scrollbar and its events.
+   */
   initScrollbar() {
+    /** @type {HTMLElement} The horizontal scrollbar element. */
     this.hScrollbar = document.getElementById('h-scrollbar');
+    /** @type {HTMLElement} The horizontal scrollbar thumb element. */
     this.hThumb = document.getElementById('h-thumb');
+    /** @type {boolean} Whether the scrollbar thumb is being dragged. */
     this.dragging = false;
+    /** @type {number} The X position where dragging started. */
     this.dragStartX = 0;
+    /** @type {number} The scroll offset when dragging started. */
     this.scrollStartX = 0;
 
     this.hThumb.addEventListener('mousedown', (e) => {
@@ -162,6 +149,9 @@ class GridRenderer {
     });
   }
 
+  /**
+   * Updates the horizontal scrollbar thumb size and position.
+   */
   updateScrollbar() {
     if (!this.hScrollbar || !this.hThumb) return;
     const totalWidth = this.grid.cols * this.cellWidth;
@@ -179,6 +169,9 @@ class GridRenderer {
     if (this.onScroll) this.onScroll();
   }
 
+  /**
+   * Renders the grid, headers, cells, and selection highlights.
+   */
   render() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -187,14 +180,11 @@ class GridRenderer {
     let startCol = Math.floor(this.scrollX / this.cellWidth);
     let offsetX = this.scrollX % this.cellWidth;
     let totalCols = Math.ceil((this.canvas.width - this.rowHeader) / this.cellWidth);
-    // let totalCols = Math.ceil((this.canvas.width - this.rowHeader + offsetX) / this.cellWidth);
 
     for (let c = 0; c < totalCols; c++) {
       let colIdx = startCol + c;
       let x = this.rowHeader + c * this.cellWidth;
       // Highlight column header if a row is selected and no column is selected
-
-
       if (this.selection.selectedRow !== null && this.selection.selectedCol === null) {
         ctx.save();
         ctx.fillStyle = '#D0F0D0'; // light green
@@ -211,7 +201,7 @@ class GridRenderer {
         ctx.restore();
         //border bottom
         ctx.save();
-        ctx.strokeStyle = '#107C41'; // or any color you want for the border
+        ctx.strokeStyle = '#107C41';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x, this.colHeader);
@@ -237,14 +227,11 @@ class GridRenderer {
     let startRow = Math.floor(this.scrollY / this.cellHeight);
     let offsetY = this.scrollY % this.cellHeight;
     let totalRows = Math.ceil((this.canvas.height - this.colHeader - 16) / this.cellHeight);
-    // let totalRows = Math.ceil((this.canvas.height - this.colHeader - 16 + offsetY) / this.cellHeight);
 
     for (let r = 0; r < totalRows; r++) {
       let rowIdx = startRow + r;
       let y = this.colHeader + r * this.cellHeight;
       // Highlight row header if a column is selected and no row is selected
-
-
       if (this.selection.selectedCol !== null && this.selection.selectedRow === null) {
         ctx.save();
         ctx.fillStyle = '#D0F0D0'; // light green
@@ -310,11 +297,10 @@ class GridRenderer {
         let value = this.grid.getCell(rowIdx, colIdx);
         ctx.fillText(value, x + 5, y + this.cellHeight / 2 + 5);
 
-
         // 3.Draw Cell Borders
         ctx.strokeStyle = "#ccc";
         ctx.beginPath();
-        ctx.lineWidth = .2;
+        ctx.lineWidth = 1;
         ctx.moveTo(x, y);
         ctx.lineTo(x + this.cellWidth, y); // top
         ctx.moveTo(x + this.cellWidth, y);
@@ -333,6 +319,11 @@ class GridRenderer {
     }
   }
 
+  /**
+   * Converts a column index to its spreadsheet-style name (A, B, ..., AA, AB, ...).
+   * @param {number} n The column index.
+   * @returns {string} The column name.
+   */
   colToName(n) {
     let name = '';
     do {
@@ -342,6 +333,12 @@ class GridRenderer {
     return name;
   }
 
+  /**
+   * Gets the rectangle for a given cell in canvas coordinates.
+   * @param {number} row The row index.
+   * @param {number} col The column index.
+   * @returns {?{x: number, y: number, w: number, h: number}} The cell rectangle or null if out of bounds.
+   */
   getCellRect(row, col) {
     const startRow = Math.floor(this.scrollY / this.cellHeight);
     const startCol = Math.floor(this.scrollX / this.cellWidth);
@@ -368,6 +365,12 @@ class GridRenderer {
     };
   }
 
+  /**
+   * Gets the cell indices at a given canvas coordinate.
+   * @param {number} x The x coordinate.
+   * @param {number} y The y coordinate.
+   * @returns {?{row: number, col: number}} The cell indices or null if out of bounds.
+   */
   getCellAt(x, y) {
     if (x < this.rowHeader || y < this.colHeader) return null;
     const startCol = Math.floor(this.scrollX / this.cellWidth);
@@ -383,129 +386,4 @@ class GridRenderer {
   }
 }
 
-class ExcelGrid {
-  constructor(canvas, input) {
-    this.rows = 100000;
-    this.cols = 1000;
-    this.cellWidth = 64;
-    this.cellHeight = 20;
-    this.rowHeader = 40;
-    this.colHeader = 24;
-    this.editingRow = null;
-    this.editingCol = null;
-    this.hideEditor = this.hideEditor.bind(this);
-    this.grid = new GridData(this.rows, this.cols);
-    this.selection = new GridSelection();
-    this.range = new GridRange();
-    this.gridCell = new GridCell(0, 0);
-    this.renderer = new GridRenderer(canvas, this.grid, this.selection, this.cellWidth, this.cellHeight, this.rowHeader, this.colHeader, () => this.updateEditorPosition(), this.gridCell);
-    this.canvas = canvas;
-    this.input = input;
-    this.attachEvents();
-    this.renderer.render();
-  }
-  updateEditorPosition() {
-    if (this.editingRow !== null && this.editingCol !== null) {
-      const rect = this.renderer.getCellRect(this.editingRow, this.editingCol);
-      if (rect) {
-        this.input.style.display = 'block';
-        this.input.style.left = `${rect.x}px`;
-        this.input.style.top = `${rect.y}px`;
-        this.input.style.width = `${rect.w - 1}px`;
-        this.input.style.height = `${rect.h - 1}px`;
-      } else {
-        this.input.style.display = 'none';
-      }
-    }
-  }
-
-  attachEvents() {
-    this.canvas.addEventListener('mousedown', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      // Row header click
-      if (x < this.rowHeader && y > this.colHeader) {
-        const row = Math.floor((y - this.colHeader) / this.cellHeight) + Math.floor(this.renderer.scrollY / this.cellHeight);
-        this.selection.selectRow(row);
-        this.renderer.render();
-        this.hideEditor();
-        return;
-      }
-      // Column header click
-      if (y < this.colHeader && x > this.rowHeader) {
-        const col = Math.floor((x - this.rowHeader) / this.cellWidth) + Math.floor(this.renderer.scrollX / this.cellWidth);
-        this.selection.selectCol(col);
-        this.renderer.render();
-        this.hideEditor();
-        return;
-      }
-
-      // Normal cell click
-      const cell = this.renderer.getCellAt(x, y);
-      if (cell) {
-        this.selection.set(cell.row, cell.col);
-        this.renderer.render();
-        this.hideEditor();
-      } else {
-        this.hideEditor();
-      }
-    });
-
-    this.canvas.addEventListener('dblclick', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const cell = this.renderer.getCellAt(x, y);
-      if (cell) {
-        this.selection.set(cell.row, cell.col);
-        this.renderer.render();
-        this.showEditor(cell.row, cell.col);
-      }
-    });
-
-    this.input.addEventListener('blur', () => {
-      this.saveEditor();
-      this.hideEditor();
-    });
-
-    this.input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.saveEditor();
-        this.hideEditor();
-      }
-    });
-  }
-  showEditor(row, col) {
-    const rect = this.renderer.getCellRect(row, col);
-    if (!rect) return;
-    this.editingRow = row;
-    this.editingCol = col;
-    this.input.style.display = 'block';
-    this.input.style.left = `${rect.x}px`;
-    this.input.style.top = `${rect.y}px`;
-    this.input.style.width = `${rect.w - 1}px`;
-    this.input.style.height = `${rect.h - 1}px`;
-    this.input.value = this.grid.getCell(row, col);
-    this.input.focus();
-    this.input.select();
-  }
-  hideEditor() {
-    this.input.style.display = 'none';
-    this.editingRow = null;
-    this.editingCol = null;
-  }
-  saveEditor() {
-    if (this.editingRow !== null && this.editingCol !== null) {
-      this.grid.setCell(this.editingRow, this.editingCol, this.input.value);
-      this.renderer.render();
-    }
-  }
-}
-
-window.onload = function () {
-  const canvas = document.getElementById('excel-canvas');
-  const input = document.getElementById('cell-editor');
-  new ExcelGrid(canvas, input);
-};
+export default GridRenderer;

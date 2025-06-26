@@ -4,18 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <title>Excel Grid Canvas</title>
+    <!-- Link to the stylesheet for grid styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
+    <!-- Container for the Excel-like grid -->
     <div id="excel-container">
+        <!-- Canvas element for rendering the grid -->
         <canvas id="excel-canvas"></canvas>
+        <!-- Input element for editing cell values -->
         <input id="cell-editor" type="text" style="display:none;" />
+        <!-- Horizontal scrollbar for the grid -->
         <div id="h-scrollbar">
             <div id="h-thumb"></div>
         </div>
     </div>
-    <script src="excel-grid.js"></script>
-</body>
-
-</html>
+    <!-- Main JavaScript module for grid functionality -->
+    <script type="module" src="script/main.js"></script>
