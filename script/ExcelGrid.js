@@ -41,12 +41,16 @@ class ExcelGrid {
     /** @type {GridCell} The grid cell object. */
     this.gridCell = new GridCell(0, 0);
     /** @type {GridRenderer} The renderer for the grid. */
+    this.colWidths = Array(this.cols).fill(this.cellWidth);
+this.rowHeights = Array(this.rows).fill(this.cellHeight);
     this.renderer = new GridRenderer(
       canvas,
       this.grid,
       this.selection,
       this.cellWidth,
       this.cellHeight,
+        this.colWidths,
+  this.rowHeights,
       this.rowHeader,
       this.colHeader,
       () => this.updateEditorPosition(),
@@ -89,18 +93,22 @@ class ExcelGrid {
 
       // Row header click
       if (x < this.rowHeader && y > this.colHeader) {
-        const row = Math.floor((y - this.colHeader) / this.cellHeight) + Math.floor(this.renderer.scrollY / this.cellHeight);
-        this.selection.selectRow(row);
-        this.renderer.render();
-        this.hideEditor();
+        const cell = this.renderer.getCellAt(this.rowHeader + 1, y);
+        if (cell) {
+          this.selection.selectRow(cell.row);
+          this.renderer.render();
+          this.hideEditor();
+        }
         return;
       }
       // Column header click
       if (y < this.colHeader && x > this.rowHeader) {
-        const col = Math.floor((x - this.rowHeader) / this.cellWidth) + Math.floor(this.renderer.scrollX / this.cellWidth);
-        this.selection.selectCol(col);
-        this.renderer.render();
-        this.hideEditor();
+        const cell = this.renderer.getCellAt(x, this.colHeader + 1);
+        if (cell) {
+          this.selection.selectCol(cell.col);
+          this.renderer.render();
+          this.hideEditor();
+        }
         return;
       }
 

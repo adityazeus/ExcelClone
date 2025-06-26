@@ -62,3 +62,20 @@ body {
     cursor: pointer;
     min-width: 30px;
 }
+
+#v-scrollbar {
+  position: absolute;
+  top: 24px; /* match colHeader */
+  right: 0;
+  width: 16px;
+  bottom: 16px; /* match h-scrollbar height */
+  background: #f0f0f0;
+}
+#v-thumb {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+}

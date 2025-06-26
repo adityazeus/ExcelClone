@@ -11,7 +11,7 @@ class GridRenderer {
    * @param {Function} onScroll Callback for scroll events.
    * @param {GridCell} gridCell The grid cell object.
    */
-  constructor(canvas, grid, selection, cellWidth, cellHeight, rowHeader, colHeader, onScroll, gridCell) {
+  constructor(canvas, grid, selection, cellWidth, cellHeight, colWidths, rowHeights, rowHeader, colHeader, onScroll, gridCell) {
     /** @type {HTMLCanvasElement} The canvas element for rendering. */
     this.canvas = canvas;
     /** @type {CanvasRenderingContext2D} The 2D rendering context. */
@@ -26,6 +26,8 @@ class GridRenderer {
     this.cellWidth = cellWidth;
     /** @type {number} The height of each cell. */
     this.cellHeight = cellHeight;
+      this.colWidths = colWidths;
+  this.rowHeights = rowHeights;
     /** @type {number} The width of the row header. */
     this.rowHeader = rowHeader;
     /** @type {number} The height of the column header. */
@@ -44,6 +46,7 @@ class GridRenderer {
     this.resize();
     window.addEventListener('resize', () => this.resize());
     this.initScrollbar();
+    this.attachResizeEvents();
   }
 
   /**
@@ -176,36 +179,32 @@ class GridRenderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw column headers (allow partial column at right)
-    let startCol = Math.floor(this.scrollX / this.cellWidth);
-    let offsetX = this.scrollX % this.cellWidth;
-    let totalCols = Math.ceil((this.canvas.width - this.rowHeader) / this.cellWidth);
-
-    for (let c = 0; c < totalCols; c++) {
-      let colIdx = startCol + c;
-      let x = this.rowHeader + c * this.cellWidth;
+    // Draw column headers
+    let cx = this.rowHeader;
+    for (let c = 0; c < this.colWidths.length && cx < this.canvas.width; c++) {
+      let colWidth = this.colWidths[c];
       // Highlight column header if a row is selected and no column is selected
       if (this.selection.selectedRow !== null && this.selection.selectedCol === null) {
         ctx.save();
         ctx.fillStyle = '#D0F0D0'; // light green
-        ctx.fillRect(x, 0, this.cellWidth, this.colHeader);
+        ctx.fillRect(cx, 0, colWidth, this.colHeader);
         ctx.restore();
       } else {
         ctx.fillStyle = '#E6E6E6';
-        ctx.fillRect(x, 0, this.cellWidth, this.colHeader);
+        ctx.fillRect(cx, 0, colWidth, this.colHeader);
       }
-      if(this.selection.col === colIdx) {
+      if(this.selection.col === c) {
         ctx.save();
         ctx.fillStyle = '#D0F0D0'; // light green
-        ctx.fillRect(x, 0, this.cellWidth, this.colHeader);
+        ctx.fillRect(cx, 0, colWidth, this.colHeader);
         ctx.restore();
         //border bottom
         ctx.save();
         ctx.strokeStyle = '#107C41';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x, this.colHeader);
-        ctx.lineTo(x+this.cellWidth, this.colHeader);
+        ctx.moveTo(cx, this.colHeader);
+        ctx.lineTo(cx+colWidth, this.colHeader);
         ctx.stroke();
         ctx.restore();
       }
@@ -213,109 +212,109 @@ class GridRenderer {
       // Only top and right borders
       ctx.strokeStyle = "#ccc";
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + this.cellWidth, 0); // top
-      ctx.moveTo(x + this.cellWidth, 0);
-      ctx.lineTo(x + this.cellWidth, this.colHeader); // right
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx + colWidth, 0); // top
+      ctx.moveTo(cx + colWidth, 0);
+      ctx.lineTo(cx + colWidth, this.colHeader); // right
       ctx.stroke();
       ctx.font = "12px Arial";
       ctx.fillStyle = '#333';
-      ctx.fillText(this.colToName(colIdx), x + 5, this.colHeader / 2 + 5);
+      ctx.fillText(this.colToName(c), cx + 5, this.colHeader / 2 + 5);
+      cx += colWidth;
     }
 
-    // Draw row headers (allow partial row at bottom)
-    let startRow = Math.floor(this.scrollY / this.cellHeight);
-    let offsetY = this.scrollY % this.cellHeight;
-    let totalRows = Math.ceil((this.canvas.height - this.colHeader - 16) / this.cellHeight);
-
-    for (let r = 0; r < totalRows; r++) {
-      let rowIdx = startRow + r;
-      let y = this.colHeader + r * this.cellHeight;
+    // Draw row headers
+    let ry = this.colHeader;
+    for (let r = 0; r < this.rowHeights.length && ry < this.canvas.height; r++) {
+      let rowHeight = this.rowHeights[r];
       // Highlight row header if a column is selected and no row is selected
       if (this.selection.selectedCol !== null && this.selection.selectedRow === null) {
         ctx.save();
         ctx.fillStyle = '#D0F0D0'; // light green
-        ctx.fillRect(0, y, this.rowHeader, this.cellHeight);
+        ctx.fillRect(0, ry, this.rowHeader, rowHeight);
         ctx.restore();
       } else {
         ctx.fillStyle = '#E6E6E6';
-        ctx.fillRect(0, y, this.rowHeader, this.cellHeight);
+        ctx.fillRect(0, ry, this.rowHeader, rowHeight);
       }
 
       // Only top and right borders
-      if (this.selection.row === rowIdx) {
+      if (this.selection.row === r) {
         ctx.save();
         ctx.fillStyle = '#CAEAD8'; // light green
-        ctx.fillRect(0, y, this.cellWidth, this.colHeader);
+        ctx.fillRect(0, ry, this.cellWidth, this.colHeader);
         ctx.restore();
         //Border bottom
         ctx.save();
         ctx.strokeStyle = '#107C41'; // or any color you want for the border
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, y + this.cellHeight);
-        ctx.lineTo(this.rowHeader, y + this.cellHeight);
+        ctx.moveTo(0, ry + rowHeight);
+        ctx.lineTo(this.rowHeader, ry + rowHeight);
         ctx.stroke();
         ctx.restore();
       }
       ctx.strokeStyle = "#ccc";
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.rowHeader, y); // top
-      ctx.moveTo(this.rowHeader, y);
-      ctx.lineTo(this.rowHeader, y + this.cellHeight); // right
+      ctx.moveTo(0, ry);
+      ctx.lineTo(this.rowHeader, ry); // top
+      ctx.moveTo(this.rowHeader, ry);
+      ctx.lineTo(this.rowHeader, ry + rowHeight); // right
       ctx.stroke();
 
       ctx.fillStyle = '#333';
-      ctx.fillText(rowIdx + 1, 5, y + this.cellHeight / 2 + 5);
+      ctx.fillText(r+ 1, 5, ry + rowHeight / 2 + 5);
+      ry += rowHeight;
     }
 
-    // Draw cells (allow partial columns/rows)
-    for (let r = 0; r < totalRows; r++) {
-      let rowIdx = startRow + r;
-      let y = this.colHeader + r * this.cellHeight;
-      for (let c = 0; c < totalCols; c++) {
-        let colIdx = startCol + c;
-        let x = this.rowHeader + c * this.cellWidth;
+    // Draw cells
+    cx = this.rowHeader;
+    for (let c = 0; c < this.colWidths.length && cx < this.canvas.width; c++) {
+      let colWidth = this.colWidths[c];
+      ry = this.colHeader;
+      for (let r = 0; r < this.rowHeights.length && ry < this.canvas.height; r++) {
+        let rowHeight = this.rowHeights[r];
 
         // 1. Fill background or highlight
         if (
-          (this.selection.selectedRow !== null && rowIdx === this.selection.selectedRow) ||
-          (this.selection.selectedCol !== null && colIdx === this.selection.selectedCol)
+          (this.selection.selectedRow !== null && r === this.selection.selectedRow) ||
+          (this.selection.selectedCol !== null && c === this.selection.selectedCol)
         ) {
           ctx.save();
           ctx.fillStyle = '#D0F0D0'; // light green highlight
-          ctx.fillRect(x, y, this.cellWidth, this.cellHeight);
+          ctx.fillRect(cx, ry, colWidth, rowHeight);
           ctx.restore();
         } else {
           ctx.fillStyle = '#fff';
-          ctx.fillRect(x, y, this.cellWidth, this.cellHeight);
+          ctx.fillRect(cx, ry, colWidth, rowHeight);
         }
 
         // 2. Draw value (after background)
         ctx.fillStyle = '#222';
-        let value = this.grid.getCell(rowIdx, colIdx);
-        ctx.fillText(value, x + 5, y + this.cellHeight / 2 + 5);
+        let value = this.grid.getCell(r, c);
+        ctx.fillText(value, cx + 5, ry + rowHeight / 2 + 5);
 
         // 3.Draw Cell Borders
         ctx.strokeStyle = "#ccc";
         ctx.beginPath();
-        ctx.lineWidth = 1;
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + this.cellWidth, y); // top
-        ctx.moveTo(x + this.cellWidth, y);
-        ctx.lineTo(x + this.cellWidth, y + this.cellHeight); // right
+        ctx.lineWidth = 0.2;
+        ctx.moveTo(cx, ry);
+        ctx.lineTo(cx + colWidth, ry); // top
+        ctx.moveTo(cx + colWidth, ry);
+        ctx.lineTo(cx + colWidth, ry + rowHeight); // right
         ctx.stroke();
 
         // Draw selection
-        if (rowIdx === this.selection.row && colIdx === this.selection.col) {
+        if (r === this.selection.row && c === this.selection.col) {
           ctx.save();
           ctx.strokeStyle = '#227447';
           ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, this.cellWidth, this.cellHeight);
+          ctx.strokeRect(cx, ry, colWidth, rowHeight);
           ctx.restore();
         }
+        ry += rowHeight;
       }
+      cx += colWidth;
     }
   }
 
@@ -340,28 +339,23 @@ class GridRenderer {
    * @returns {?{x: number, y: number, w: number, h: number}} The cell rectangle or null if out of bounds.
    */
   getCellRect(row, col) {
-    const startRow = Math.floor(this.scrollY / this.cellHeight);
-    const startCol = Math.floor(this.scrollX / this.cellWidth);
-    const offsetX = this.scrollX % this.cellWidth;
-    const offsetY = this.scrollY % this.cellHeight;
-    const r = row - startRow;
-    const c = col - startCol;
-    if (r < 0 || c < 0) return null;
-    const x = this.rowHeader + c * this.cellWidth;
-    // const x = this.rowHeader + c * this.cellWidth - offsetX;
-    const y = this.colHeader + r * this.cellHeight;
-    // const y = this.colHeader + r * this.cellHeight - offsetY;
+    let x = this.rowHeader;
+    for (let c = 0; c < col; c++) x += this.colWidths[c];
+    x -= this.scrollX;
+    let y = this.colHeader;
+    for (let r = 0; r < row; r++) y += this.rowHeights[r];
+    y -= this.scrollY;
     if (
-      x + this.cellWidth < this.rowHeader ||
-      y + this.cellHeight < this.colHeader ||
+      x + this.colWidths[col] < this.rowHeader ||
+      y + this.rowHeights[row] < this.colHeader ||
       x > this.canvas.width ||
       y > this.canvas.height
     ) return null;
     return {
       x: x,
       y: y,
-      w: this.cellWidth,
-      h: this.cellHeight
+      w: this.colWidths[col],
+      h: this.rowHeights[row]
     };
   }
 
@@ -373,16 +367,109 @@ class GridRenderer {
    */
   getCellAt(x, y) {
     if (x < this.rowHeader || y < this.colHeader) return null;
-    const startCol = Math.floor(this.scrollX / this.cellWidth);
-    const startRow = Math.floor(this.scrollY / this.cellHeight);
-    const offsetX = this.scrollX % this.cellWidth;
-    const offsetY = this.scrollY % this.cellHeight;
-    const col = Math.floor((x - this.rowHeader) / this.cellWidth) + startCol;
-    // const col = Math.floor((x - this.rowHeader + offsetX) / this.cellWidth) + startCol;
-    const row = Math.floor((y - this.colHeader) / this.cellHeight) + startRow;
-    // const row = Math.floor((y - this.colHeader + offsetY) / this.cellHeight) + startRow;
+    let cx = this.rowHeader, col = 0;
+    x += this.scrollX;
+    while (col < this.colWidths.length && cx + this.colWidths[col] <= x) {
+      cx += this.colWidths[col];
+      col++;
+    }
+    let ry = this.colHeader, row = 0;
+    y += this.scrollY;
+    while (row < this.rowHeights.length && ry + this.rowHeights[row] <= y) {
+      ry += this.rowHeights[row];
+      row++;
+    }
     if (row >= this.grid.rows || col >= this.grid.cols) return null;
     return { row, col };
+  }
+
+  /**
+   * Attaches resize events for columns and rows.
+   */
+  attachResizeEvents() {
+    let resizingCol = null, resizingRow = null, startX = 0, startY = 0, startWidth = 0, startHeight = 0;
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      let colEdge = this.getColEdgeAt(x, y);
+      let rowEdge = this.getRowEdgeAt(x, y);
+      if (colEdge !== null) {
+        this.canvas.style.cursor = 'col-resize';
+      } else if (rowEdge !== null) {
+        this.canvas.style.cursor = 'row-resize';
+      } else {
+        this.canvas.style.cursor = '';
+      }
+    });
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      let colEdge = this.getColEdgeAt(x, y);
+      let rowEdge = this.getRowEdgeAt(x, y);
+      if (colEdge !== null) {
+        resizingCol = colEdge;
+        startX = x;
+        startWidth = this.colWidths[colEdge];
+        document.body.style.userSelect = 'none';
+      } else if (rowEdge !== null) {
+        resizingRow = rowEdge;
+        startY = y;
+        startHeight = this.rowHeights[rowEdge];
+        document.body.style.userSelect = 'none';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (resizingCol !== null) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        let newWidth = Math.max(24, startWidth + (x - startX));
+        this.colWidths[resizingCol] = newWidth;
+        this.render();
+        this.updateScrollbar && this.updateScrollbar();
+      }
+      if (resizingRow !== null) {
+        const rect = this.canvas.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        let newHeight = Math.max(12, startHeight + (y - startY));
+        this.rowHeights[resizingRow] = newHeight;
+        this.render();
+        this.updateScrollbar && this.updateScrollbar();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      resizingCol = null;
+      resizingRow = null;
+      document.body.style.userSelect = '';
+    });
+  }
+
+  getColEdgeAt(x, y) {
+    if (y > 0 && y < this.colHeader && x > this.rowHeader) {
+      let cx = this.rowHeader;
+      for (let c = 0; c < this.colWidths.length; c++) {
+        cx += this.colWidths[c];
+        if (Math.abs(x - cx) < 4) return c;
+        if (cx > this.canvas.width) break;
+      }
+    }
+    return null;
+  }
+
+  getRowEdgeAt(x, y) {
+    if (x > 0 && x < this.rowHeader && y > this.colHeader) {
+      let ry = this.colHeader;
+      for (let r = 0; r < this.rowHeights.length; r++) {
+        ry += this.rowHeights[r];
+        if (Math.abs(y - ry) < 4) return r;
+        if (ry > this.canvas.height) break;
+      }
+    }
+    return null;
   }
 }
 
