@@ -15,6 +15,10 @@ class GridSelection {
     this.selectedRow = null;
     /** @type {?number} The currently selected column index for column selection, or null if none */
     this.selectedCol = null;
+    /** @type {Array<number>} The currently selected rows */
+    this.selectedRows = [];
+    /** @type {Array<number>} The currently selected columns */
+    this.selectedCols = [];
   }
 
   /**
@@ -49,6 +53,38 @@ class GridSelection {
     this.selectedRow = null;
     this.row = -1;
     this.col = -1;
+  }
+
+  /**
+   * Sets multiple rows as selected.
+   * @param {Array<number>} rows The array of row indices to select.
+   */
+  setRows(rows) {
+    this.selectedRows = rows.slice();
+    this.selectedRow = null;
+    this.selectedCol = null;
+    this.row = -1;
+    this.col = -1;
+  }
+
+  /**
+   * Sets multiple columns as selected.
+   * @param {Array<number>} cols The array of column indices to select.
+   */
+  setCols(cols) {
+    this.selectedCols = cols.slice();
+    this.selectedRow = null;
+    this.selectedCol = null;
+    this.row = -1;
+    this.col = -1;
+  }
+
+  /**
+   * Clears the selection of multiple rows and columns.
+   */
+  clearMulti() {
+    this.selectedRows = [];
+    this.selectedCols = [];
   }
 }
 

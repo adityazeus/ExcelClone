@@ -26,8 +26,8 @@ class GridRenderer {
     this.cellWidth = cellWidth;
     /** @type {number} The height of each cell. */
     this.cellHeight = cellHeight;
-      this.colWidths = colWidths;
-  this.rowHeights = rowHeights;
+    this.colWidths = colWidths;
+    this.rowHeights = rowHeights;
     /** @type {number} The width of the row header. */
     this.rowHeader = rowHeader;
     /** @type {number} The height of the column header. */
@@ -54,8 +54,8 @@ class GridRenderer {
    */
   resize() {
     let dpr = window.devicePixelRatio || 1;
-    this.canvas.width = window.innerWidth*dpr;
-    this.canvas.height = window.innerHeight*dpr;
+    this.canvas.width = window.innerWidth * dpr;
+    this.canvas.height = window.innerHeight * dpr;
     this.ctx.scale(dpr, dpr);
     this.visibleRows = Math.ceil((this.canvas.height - this.colHeader - 16) / this.cellHeight); // 16px for scrollbar
     this.visibleCols = Math.ceil((this.canvas.width - this.rowHeader) / this.cellWidth);
@@ -78,6 +78,7 @@ class GridRenderer {
         // Vertical scroll
         this.scrollY += Math.sign(e.deltaY) * 30;
         this.scrollY = Math.max(0, Math.min(this.scrollY, this.maxScrollY()));
+        this.updateScrollbar(); // <-- Add this line
       }
       if (this.onScroll) this.onScroll();
       this.render();
@@ -105,15 +106,11 @@ class GridRenderer {
    * Initializes the horizontal scrollbar and its events.
    */
   initScrollbar() {
-    /** @type {HTMLElement} The horizontal scrollbar element. */
+    // --- Horizontal Scrollbar ---
     this.hScrollbar = document.getElementById('h-scrollbar');
-    /** @type {HTMLElement} The horizontal scrollbar thumb element. */
     this.hThumb = document.getElementById('h-thumb');
-    /** @type {boolean} Whether the scrollbar thumb is being dragged. */
     this.dragging = false;
-    /** @type {number} The X position where dragging started. */
     this.dragStartX = 0;
-    /** @type {number} The scroll offset when dragging started. */
     this.scrollStartX = 0;
 
     this.hThumb.addEventListener('mousedown', (e) => {
@@ -132,10 +129,20 @@ class GridRenderer {
         this.updateScrollbar();
         this.render();
       }
+      // --- Vertical Thumb Drag ---
+      if (this.vDragging) {
+        const dy = e.clientY - this.vDragStartY;
+        const trackHeight = this.vScrollbar.offsetHeight - this.vThumb.offsetHeight;
+        const maxScroll = this.maxScrollY();
+        this.scrollY = Math.max(0, Math.min(this.vScrollStartY + dy * (maxScroll / trackHeight), maxScroll));
+        this.updateScrollbar();
+        this.render();
+      }
     });
 
     window.addEventListener('mouseup', () => {
       this.dragging = false;
+      this.vDragging = false;
       document.body.style.userSelect = '';
     });
 
@@ -150,27 +157,72 @@ class GridRenderer {
       this.updateScrollbar();
       this.render();
     });
-  }
 
+    // --- Vertical Scrollbar ---
+    this.vScrollbar = document.getElementById('v-scrollbar');
+    this.vThumb = document.getElementById('v-thumb');
+    this.vDragging = false;
+    this.vDragStartY = 0;
+    this.vScrollStartY = 0;
+
+    this.vThumb.addEventListener('mousedown', (e) => {
+      this.vDragging = true;
+      this.vDragStartY = e.clientY;
+      this.vScrollStartY = this.scrollY;
+      document.body.style.userSelect = 'none';
+    });
+
+    this.vScrollbar.addEventListener('click', (e) => {
+      if (e.target === this.vThumb) return;
+      const rect = this.vScrollbar.getBoundingClientRect();
+      const clickY = e.clientY - rect.top;
+      const thumbHeight = this.vThumb.offsetHeight;
+      const trackHeight = this.vScrollbar.offsetHeight - thumbHeight;
+      const maxScroll = this.maxScrollY();
+      this.scrollY = Math.max(0, Math.min((clickY - thumbHeight / 2) * (maxScroll / trackHeight), maxScroll));
+      this.updateScrollbar();
+      this.render();
+    });
+  }
   /**
    * Updates the horizontal scrollbar thumb size and position.
    */
   updateScrollbar() {
-    if (!this.hScrollbar || !this.hThumb) return;
-    const totalWidth = this.grid.cols * this.cellWidth;
-    const visibleWidth = this.canvas.width - this.rowHeader;
-    const trackWidth = this.hScrollbar.offsetWidth;
-    const maxScroll = this.maxScrollX();
+    // --- Horizontal Thumb ---
+    if (this.hScrollbar && this.hThumb) {
+      const totalWidth = this.grid.cols * this.cellWidth;
+      const visibleWidth = this.canvas.width - this.rowHeader;
+      const trackWidth = this.hScrollbar.offsetWidth;
+      const maxScroll = this.maxScrollX();
 
-    // Thumb size and position
-    let thumbWidth = Math.max(30, (visibleWidth / totalWidth) * trackWidth);
-    let thumbLeft = maxScroll === 0 ? 0 : (this.scrollX / maxScroll) * (trackWidth - thumbWidth);
-    if (!isFinite(thumbLeft)) thumbLeft = 0;
+      let thumbWidth = Math.max(30, (visibleWidth / totalWidth) * trackWidth);
+      let thumbLeft = maxScroll === 0 ? 0 : (this.scrollX / maxScroll) * (trackWidth - thumbWidth);
+      if (!isFinite(thumbLeft)) thumbLeft = 0;
 
-    this.hThumb.style.width = thumbWidth + 'px';
-    this.hThumb.style.left = thumbLeft + 'px';
+      this.hThumb.style.width = thumbWidth + 'px';
+      this.hThumb.style.left = thumbLeft + 'px';
+    }
+
+    // --- Vertical Thumb ---
+    if (this.vScrollbar && this.vThumb) {
+      const totalHeight = this.grid.rows * this.cellHeight;
+      const visibleHeight = this.canvas.height - this.colHeader - 16;
+      const trackHeight = this.vScrollbar.offsetHeight;
+      const maxScroll = this.maxScrollY();
+
+      let thumbHeight = Math.max(30, (visibleHeight / totalHeight) * trackHeight);
+      let thumbTop = maxScroll === 0 ? 0 : (this.scrollY / maxScroll) * (trackHeight - thumbHeight);
+      if (!isFinite(thumbTop)) thumbTop = 0;
+
+      this.vThumb.style.height = thumbHeight + 'px';
+      this.vThumb.style.top = thumbTop + 'px';
+    }
+
     if (this.onScroll) this.onScroll();
   }
+
+
+
 
   /**
    * Renders the grid, headers, cells, and selection highlights.
@@ -179,37 +231,172 @@ class GridRenderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw column headers
-    let cx = this.rowHeader;
-    for (let c = 0; c < this.colWidths.length && cx < this.canvas.width; c++) {
+    // Calculate visible startCol/startRow and partial scroll offset
+    let startCol = 0, accumulatedWidth = 0;
+    while (startCol < this.colWidths.length && accumulatedWidth + this.colWidths[startCol] <= this.scrollX) {
+      accumulatedWidth += this.colWidths[startCol];
+      startCol++;
+    }
+    let startRow = 0, accumulatedHeight = 0;
+    while (startRow < this.rowHeights.length && accumulatedHeight + this.rowHeights[startRow] <= this.scrollY) {
+      accumulatedHeight += this.rowHeights[startRow];
+      startRow++;
+    }
+    this.renderCells(ctx, startCol, startRow, accumulatedWidth, accumulatedHeight);
+    this.renderRowHeaders(ctx, startRow, accumulatedHeight);
+    this.renderColumnHeaders(ctx, startCol, accumulatedWidth);
+
+    ctx.save();
+    ctx.fillStyle = '#E6E6E6'; // Same as row/col header color
+    ctx.fillRect(0, 0, this.rowHeader, this.colHeader);
+    ctx.restore();
+  }
+
+  renderColumnHeaders(ctx, startCol, accumulatedWidth) {
+    let cx = this.rowHeader - (this.scrollX - accumulatedWidth);
+    // --- Multi-cell selection header highlight ---
+    let multiCellCols = [];
+    if (
+      this.multiCellSelection &&
+      this.multiCellSelection.startCell &&
+      this.multiCellSelection.endCell &&
+      (this.multiCellSelection.isSelectingCells ||
+        (this.multiCellSelection.startCell.row !== this.multiCellSelection.endCell.row ||
+          this.multiCellSelection.startCell.col !== this.multiCellSelection.endCell.col))
+    ) {
+      const c1 = Math.min(this.multiCellSelection.startCell.col, this.multiCellSelection.endCell.col);
+      const c2 = Math.max(this.multiCellSelection.startCell.col, this.multiCellSelection.endCell.col);
+      for (let c = c1; c <= c2; c++) multiCellCols.push(c);
+    }
+    for (let c = startCol; c < this.colWidths.length && cx < this.canvas.width; c++) {
       let colWidth = this.colWidths[c];
-      // Highlight column header if a row is selected and no column is selected
-      if (this.selection.selectedRow !== null && this.selection.selectedCol === null) {
+      const multiCol = this.selection.selectedCols || [];
+      const multiRow = this.selection.selectedRows || [];
+
+      const isSelected = multiCol.includes(c) || (this.selection.selectedRow !== null && this.selection.selectedCol === null);
+
+      // Header background
+      if (isSelected) {
         ctx.save();
-        ctx.fillStyle = '#D0F0D0'; // light green
+        ctx.fillStyle = '#107C41'; // selected header color
         ctx.fillRect(cx, 0, colWidth, this.colHeader);
         ctx.restore();
       } else {
         ctx.fillStyle = '#E6E6E6';
         ctx.fillRect(cx, 0, colWidth, this.colHeader);
       }
-      if(this.selection.col === c) {
+
+      const isSelected1 = multiCol.includes(c) || (this.selection.selectedRow !== null && this.selection.selectedCol === null);
+
+      // Highlight column header for multi-cell selection
+      if (multiCellCols.includes(c)) {
         ctx.save();
-        ctx.fillStyle = '#D0F0D0'; // light green
+        ctx.fillStyle = '#CAEAD8';
         ctx.fillRect(cx, 0, colWidth, this.colHeader);
         ctx.restore();
-        //border bottom
+
+        // Only bottom border
         ctx.save();
         ctx.strokeStyle = '#107C41';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(cx, this.colHeader);
-        ctx.lineTo(cx+colWidth, this.colHeader);
+        ctx.lineTo(cx + colWidth, this.colHeader);
         ctx.stroke();
         ctx.restore();
       }
 
-      // Only top and right borders
+      // Border bottom for selected
+      if (isSelected1) {
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, this.colHeader);
+        ctx.lineTo(cx + colWidth, this.colHeader);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Draw left border for first selected column and right border for last selected column (full height)
+      if (multiCol.length > 0) {
+        const firstCol = Math.min(...multiCol);
+        const lastCol = Math.max(...multiCol);
+        if (c === firstCol) {
+          ctx.save();
+          ctx.strokeStyle = '#107C41';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(cx, 0);
+          ctx.lineTo(cx, this.canvas.height);
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (c === lastCol) {
+          ctx.save();
+          ctx.strokeStyle = '#107C41';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(cx + colWidth, 0);
+          ctx.lineTo(cx + colWidth, this.canvas.height);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // Highlight col header when a row or multiple rows are selected (but not columns)
+      if (
+        multiRow.length > 0 &&
+        multiCol.length === 0
+      ) {
+        ctx.save();
+        ctx.fillStyle = '#CAEAD8';
+        ctx.fillRect(cx, 0, colWidth, this.colHeader);
+        ctx.restore();
+
+        // Bottom border
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, this.colHeader);
+        ctx.lineTo(cx + colWidth, this.colHeader);
+        ctx.stroke();
+        ctx.restore();
+
+        // Set font and color for text
+        ctx.font = "bold 12px Arial";
+        ctx.fillStyle = "#333";
+      }
+
+      // Highlight only the header of the selected cell (if no multiCol selection)
+      if (
+        multiCol.length === 0 &&
+        this.selection.col === c &&
+        this.selection.row !== null
+      ) {
+        // Header background
+        ctx.save();
+        ctx.fillStyle = '#CAEAD8';
+        ctx.fillRect(cx, 0, colWidth, this.colHeader);
+        ctx.restore();
+
+        // Bottom border
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, this.colHeader);
+        ctx.lineTo(cx + colWidth, this.colHeader);
+        ctx.stroke();
+        ctx.restore();
+
+        // Set font and color for text
+        ctx.font = "bold 12px Arial";
+        ctx.fillStyle = "#fff";
+      }
+
+      // Top and right borders
       ctx.strokeStyle = "#ccc";
       ctx.beginPath();
       ctx.moveTo(cx, 0);
@@ -217,20 +404,44 @@ class GridRenderer {
       ctx.moveTo(cx + colWidth, 0);
       ctx.lineTo(cx + colWidth, this.colHeader); // right
       ctx.stroke();
-      ctx.font = "12px Arial";
-      ctx.fillStyle = '#333';
-      ctx.fillText(this.colToName(c), cx + 5, this.colHeader / 2 + 5);
+
+      // Center align column header text, white & bold if selected
+      ctx.font = isSelected ? "bold 12px Arial" : "12px Arial";
+      ctx.fillStyle = isSelected ? "#fff" : "#333";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(this.colToName(c), cx + colWidth / 2, this.colHeader / 2);
+
       cx += colWidth;
     }
+  }
 
-    // Draw row headers
-    let ry = this.colHeader;
-    for (let r = 0; r < this.rowHeights.length && ry < this.canvas.height; r++) {
+  renderRowHeaders(ctx, startRow, accumulatedHeight) {
+    let ry = this.colHeader - (this.scrollY - accumulatedHeight);
+    // --- Multi-cell selection header highlight ---
+    let multiCellRows = [];
+    if (
+      this.multiCellSelection &&
+      this.multiCellSelection.startCell &&
+      this.multiCellSelection.endCell &&
+      (this.multiCellSelection.isSelectingCells ||
+        (this.multiCellSelection.startCell.row !== this.multiCellSelection.endCell.row ||
+          this.multiCellSelection.startCell.col !== this.multiCellSelection.endCell.col))
+    ) {
+      const r1 = Math.min(this.multiCellSelection.startCell.row, this.multiCellSelection.endCell.row);
+      const r2 = Math.max(this.multiCellSelection.startCell.row, this.multiCellSelection.endCell.row);
+      for (let r = r1; r <= r2; r++) multiCellRows.push(r);
+    }
+    for (let r = startRow; r < this.rowHeights.length && ry < this.canvas.height; r++) {
       let rowHeight = this.rowHeights[r];
-      // Highlight row header if a column is selected and no row is selected
-      if (this.selection.selectedCol !== null && this.selection.selectedRow === null) {
+      const multiRow = this.selection.selectedRows || [];
+      const multiCol = this.selection.selectedCols || [];
+      const isSelected = multiRow.includes(r) || (this.selection.selectedCol !== null && this.selection.selectedRow === null);
+
+      // Header background
+      if (isSelected) {
         ctx.save();
-        ctx.fillStyle = '#D0F0D0'; // light green
+        ctx.fillStyle = '#107C41'; // selected header color
         ctx.fillRect(0, ry, this.rowHeader, rowHeight);
         ctx.restore();
       } else {
@@ -238,22 +449,115 @@ class GridRenderer {
         ctx.fillRect(0, ry, this.rowHeader, rowHeight);
       }
 
-      // Only top and right borders
-      if (this.selection.row === r) {
+      // Highlight row header for multi-cell selection
+      if (multiCellRows.includes(r)) {
         ctx.save();
-        ctx.fillStyle = '#CAEAD8'; // light green
-        ctx.fillRect(0, ry, this.cellWidth, this.colHeader);
+        ctx.fillStyle = '#CAEAD8';
+        ctx.fillRect(0, ry, this.rowHeader, rowHeight);
         ctx.restore();
-        //Border bottom
+
+        // Border at right side
         ctx.save();
-        ctx.strokeStyle = '#107C41'; // or any color you want for the border
+        ctx.strokeStyle = '#107C41';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, ry + rowHeight);
+        ctx.moveTo(this.rowHeader, ry);
         ctx.lineTo(this.rowHeader, ry + rowHeight);
         ctx.stroke();
         ctx.restore();
       }
+
+      // Border right for selected
+      if (isSelected) {
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.rowHeader, ry);
+        ctx.lineTo(this.rowHeader, ry + rowHeight);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Draw top border for first selected row and bottom border for last selected row (full width)
+      if (multiRow.length > 0) {
+        const firstRow = Math.min(...multiRow);
+        const lastRow = Math.max(...multiRow);
+        if (r === firstRow) {
+          ctx.save();
+          ctx.strokeStyle = '#107C41';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, ry);
+          ctx.lineTo(this.canvas.width, ry);
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (r === lastRow) {
+          ctx.save();
+          ctx.strokeStyle = '#107C41';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, ry + rowHeight);
+          ctx.lineTo(this.canvas.width, ry + rowHeight);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // Highlight row header when a column or multiple columns are selected (but not rows)
+      if (
+        multiCol.length > 0 &&
+        multiRow.length === 0
+      ) {
+        ctx.save();
+        ctx.fillStyle = '#CAEAD8';
+        ctx.fillRect(0, ry, this.rowHeader, rowHeight);
+        ctx.restore();
+
+        // Left border
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, ry);
+        ctx.lineTo(0, ry + rowHeight);
+        ctx.stroke();
+        ctx.restore();
+
+        // Set font and color for text
+        ctx.font = "bold 12px Arial";
+        ctx.fillStyle = "#333";
+      }
+
+      // Highlight only the header of the selected cell (if no multiRow selection)
+      if (
+        multiRow.length === 0 &&
+        this.selection.row === r &&
+        this.selection.col !== null
+      ) {
+        // Header background
+        ctx.save();
+        ctx.fillStyle = '#CAEAD8';
+        ctx.fillRect(0, ry, this.rowHeader, rowHeight);
+        ctx.restore();
+
+        // Right border
+        ctx.save();
+        ctx.strokeStyle = '#107C41';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.rowHeader, ry);
+        ctx.lineTo(this.rowHeader, ry + rowHeight);
+        ctx.stroke();
+        ctx.restore();
+
+        // Set font and color for text
+        ctx.font = "bold 12px Arial";
+        ctx.fillStyle = "#fff";
+      }
+
+      // Top and right borders
       ctx.strokeStyle = "#ccc";
       ctx.beginPath();
       ctx.moveTo(0, ry);
@@ -262,21 +566,31 @@ class GridRenderer {
       ctx.lineTo(this.rowHeader, ry + rowHeight); // right
       ctx.stroke();
 
-      ctx.fillStyle = '#333';
-      ctx.fillText(r+ 1, 5, ry + rowHeight / 2 + 5);
+      // Right align row header text, white & bold if selected
+      ctx.font = isSelected ? "bold 12px Arial" : "12px Arial";
+      ctx.fillStyle = isSelected ? "#fff" : "#333";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(r + 1, this.rowHeader - 5, ry + rowHeight / 2);
+
       ry += rowHeight;
     }
+  }
 
-    // Draw cells
-    cx = this.rowHeader;
-    for (let c = 0; c < this.colWidths.length && cx < this.canvas.width; c++) {
+  renderCells(ctx, startCol, startRow, accumulatedWidth, accumulatedHeight) {
+    let cx = this.rowHeader - (this.scrollX - accumulatedWidth);
+    for (let c = startCol; c < this.colWidths.length && cx < this.canvas.width; c++) {
       let colWidth = this.colWidths[c];
-      ry = this.colHeader;
-      for (let r = 0; r < this.rowHeights.length && ry < this.canvas.height; r++) {
+      let ry = this.colHeader - (this.scrollY - accumulatedHeight);
+      for (let r = startRow; r < this.rowHeights.length && ry < this.canvas.height; r++) {
         let rowHeight = this.rowHeights[r];
+        const multiRow = this.selection.selectedRows || [];
+        const multiCol = this.selection.selectedCols || [];
 
-        // 1. Fill background or highlight
+        // Highlight
         if (
+          (multiRow.includes(r)) ||
+          (multiCol.includes(c)) ||
           (this.selection.selectedRow !== null && r === this.selection.selectedRow) ||
           (this.selection.selectedCol !== null && c === this.selection.selectedCol)
         ) {
@@ -289,15 +603,45 @@ class GridRenderer {
           ctx.fillRect(cx, ry, colWidth, rowHeight);
         }
 
-        // 2. Draw value (after background)
-        ctx.fillStyle = '#222';
-        let value = this.grid.getCell(r, c);
-        ctx.fillText(value, cx + 5, ry + rowHeight / 2 + 5);
+        // Left/right border for selected columns
+        // if (multiCol.includes(c)) {
+        //   ctx.save();
+        //   ctx.strokeStyle = '#107C41';
+        //   ctx.lineWidth = 2;
+        //   ctx.beginPath();
+        //   ctx.moveTo(cx, 0);
+        //   ctx.lineTo(cx, this.canvas.height);
+        //   ctx.moveTo(cx + colWidth, 0);
+        //   ctx.lineTo(cx + colWidth, this.canvas.height);
+        //   ctx.stroke();
+        //   ctx.restore();
+        // }
 
-        // 3.Draw Cell Borders
+        // Top/bottom border for selected rows
+        // if (multiRow.includes(r)) {
+        //   ctx.save();
+        //   ctx.strokeStyle = '#107C41';
+        //   ctx.lineWidth = 2;
+        //   ctx.beginPath();
+        //   ctx.moveTo(0, ry);
+        //   ctx.lineTo(this.canvas.width, ry);
+        //   ctx.moveTo(0, ry + rowHeight);
+        //   ctx.lineTo(this.canvas.width, ry + rowHeight);
+        //   ctx.stroke();
+        //   ctx.restore();
+        // }
+
+        // Draw value
+        ctx.fillStyle = '#222';
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        let value = this.grid.getCell(r, c);
+        ctx.fillText(value, cx + 5, ry + rowHeight / 2);
+
+        // Cell Borders
         ctx.strokeStyle = "#ccc";
         ctx.beginPath();
-        ctx.lineWidth = 0.2;
+        ctx.lineWidth = 0.0;
         ctx.moveTo(cx, ry);
         ctx.lineTo(cx + colWidth, ry); // top
         ctx.moveTo(cx + colWidth, ry);
@@ -309,14 +653,68 @@ class GridRenderer {
           ctx.save();
           ctx.strokeStyle = '#227447';
           ctx.lineWidth = 2;
-          ctx.strokeRect(cx, ry, colWidth, rowHeight);
+          ctx.strokeRect(cx, ry, colWidth - 1, rowHeight - 1);
           ctx.restore();
+        }
+
+        // Only draw left border for first selected column and right border for last selected column
+        if (multiCol.length > 0) {
+          const firstCol = Math.min(...multiCol);
+          const lastCol = Math.max(...multiCol);
+          if (c === firstCol) {
+            ctx.save();
+            ctx.strokeStyle = '#107C41';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, 0);
+            ctx.lineTo(cx, this.canvas.height);
+            ctx.stroke();
+            ctx.restore();
+          }
+          if (c === lastCol) {
+            ctx.save();
+            ctx.strokeStyle = '#107C41';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx + colWidth, 0);
+            ctx.lineTo(cx + colWidth, this.canvas.height);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // Only draw top border for first selected row and bottom border for last selected row
+        if (multiRow.length > 0) {
+          const firstRow = Math.min(...multiRow);
+          const lastRow = Math.max(...multiRow);
+          if (r === firstRow) {
+            ctx.save();
+            ctx.strokeStyle = '#107C41';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, ry);
+            ctx.lineTo(this.canvas.width, ry);
+            ctx.stroke();
+            ctx.restore();
+          }
+          if (r === lastRow) {
+            ctx.save();
+            ctx.strokeStyle = '#107C41';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, ry + rowHeight);
+            ctx.lineTo(this.canvas.width, ry + rowHeight);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
         ry += rowHeight;
       }
       cx += colWidth;
     }
   }
+
+
 
   /**
    * Converts a column index to its spreadsheet-style name (A, B, ..., AA, AB, ...).
@@ -450,7 +848,7 @@ class GridRenderer {
 
   getColEdgeAt(x, y) {
     if (y > 0 && y < this.colHeader && x > this.rowHeader) {
-      let cx = this.rowHeader;
+      let cx = this.rowHeader - this.scrollX; // <-- subtract scrollX
       for (let c = 0; c < this.colWidths.length; c++) {
         cx += this.colWidths[c];
         if (Math.abs(x - cx) < 4) return c;
@@ -462,7 +860,7 @@ class GridRenderer {
 
   getRowEdgeAt(x, y) {
     if (x > 0 && x < this.rowHeader && y > this.colHeader) {
-      let ry = this.colHeader;
+      let ry = this.colHeader - this.scrollY; // <-- subtract scrollY
       for (let r = 0; r < this.rowHeights.length; r++) {
         ry += this.rowHeights[r];
         if (Math.abs(y - ry) < 4) return r;
@@ -471,6 +869,7 @@ class GridRenderer {
     }
     return null;
   }
+
 }
 
 export default GridRenderer;

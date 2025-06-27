@@ -75,6 +75,7 @@ body {
   position: absolute;
   left: 0;
   width: 100%;
+  height: 30px;      /* <-- Add this line for default visibility */
   background: #ccc;
   border-radius: 8px;
   cursor: pointer;
