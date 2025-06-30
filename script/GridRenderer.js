@@ -11,7 +11,11 @@ class GridRenderer {
    * @param {Function} onScroll Callback for scroll events.
    * @param {GridCell} gridCell The grid cell object.
    */
-  constructor(canvas, grid, selection, cellWidth, cellHeight, colWidths, rowHeights, rowHeader, colHeader, onScroll, gridCell) {
+  constructor(
+    canvas, grid, selection, cellWidth, cellHeight, colWidths, rowHeights,
+    rowHeader, colHeader,onScroll, updateEditorPosition, gridCell,
+    onColResizeEnd, onRowResizeEnd
+  ) {
     /** @type {HTMLCanvasElement} The canvas element for rendering. */
     this.canvas = canvas;
     /** @type {CanvasRenderingContext2D} The 2D rendering context. */
@@ -42,6 +46,11 @@ class GridRenderer {
     this.visibleCols = 0;
     /** @type {Function} Callback for scroll events. */
     this.onScroll = onScroll;
+    this.onColResizeEnd = onColResizeEnd;
+    this.onRowResizeEnd = onRowResizeEnd;
+    this.autoScrollInterval = null;
+    this.autoScrollEdgeSize = 30; // px from edge to trigger auto-scroll
+    this.autoScrollSpeed = 30;    // px per interval
     this.attachScroll();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -406,7 +415,7 @@ class GridRenderer {
       ctx.stroke();
 
       // Center align column header text, white & bold if selected
-      ctx.font = isSelected ? "bold 12px Arial" : "12px Arial";
+      ctx.font = "12px Arial";
       ctx.fillStyle = isSelected ? "#fff" : "#333";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -811,11 +820,21 @@ class GridRenderer {
         resizingCol = colEdge;
         startX = x;
         startWidth = this.colWidths[colEdge];
+        // --- ADD THESE LINES ---
+        this.isResizingCol = true;
+        this.resizingColIndex = colEdge;
+        this.startColWidth = startWidth;
+        // -----------------------
         document.body.style.userSelect = 'none';
       } else if (rowEdge !== null) {
         resizingRow = rowEdge;
         startY = y;
         startHeight = this.rowHeights[rowEdge];
+        // --- ADD THESE LINES ---
+        this.isResizingRow = true;
+        this.resizingRowIndex = rowEdge;
+        this.startRowHeight = startHeight;
+        // -----------------------
         document.body.style.userSelect = 'none';
       }
     });
@@ -837,9 +856,68 @@ class GridRenderer {
         this.render();
         this.updateScrollbar && this.updateScrollbar();
       }
+
+      // --- Auto-scroll logic ---
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Clear previous interval if any
+      if (this.autoScrollInterval) clearInterval(this.autoScrollInterval);
+
+      let scrollX = 0, scrollY = 0;
+      if (x > this.canvas.width - this.autoScrollEdgeSize) scrollX = this.autoScrollSpeed;
+      else if (x < this.autoScrollEdgeSize) scrollX = -this.autoScrollSpeed;
+      if (y > this.canvas.height - this.autoScrollEdgeSize) scrollY = this.autoScrollSpeed;
+      else if (y < this.autoScrollEdgeSize) scrollY = -this.autoScrollSpeed;
+
+      if (scrollX !== 0 || scrollY !== 0) {
+        this.autoScrollInterval = setInterval(() => {
+          if (scrollX !== 0) {
+            this.scrollX = Math.max(0, Math.min(this.scrollX + scrollX, this.maxScrollX()));
+          }
+          if (scrollY !== 0) {
+            this.scrollY = Math.max(0, Math.min(this.scrollY + scrollY, this.maxScrollY()));
+          }
+          this.updateScrollbar && this.updateScrollbar();
+          this.render();
+          // Optionally, update selection here if needed
+        }, 50);
+      }
     });
 
     window.addEventListener('mouseup', () => {
+      // When resizing a column ends (e.g., on mouseup after drag):
+      if (this.isResizingCol) {
+        const col = this.resizingColIndex;
+        const oldWidth = this.startColWidth;
+        const newWidth = this.colWidths[col];
+        if (this.onColResizeEnd) {
+          this.onColResizeEnd(col, oldWidth, newWidth);
+        }
+        this.isResizingCol = false;
+        this.resizingColIndex = null;
+        this.startColWidth = null;
+      }
+
+      // When resizing a row ends:
+      if (this.isResizingRow) {
+        const row = this.resizingRowIndex;
+        const oldHeight = this.startRowHeight;
+        const newHeight = this.rowHeights[row];
+        if (this.onRowResizeEnd) {
+          this.onRowResizeEnd(row, oldHeight, newHeight);
+        }
+        this.isResizingRow = false;
+        this.resizingRowIndex = null;
+        this.startRowHeight = null;
+      }
+
+      if (this.autoScrollInterval) {
+        clearInterval(this.autoScrollInterval);
+        this.autoScrollInterval = null;
+      }
+
       resizingCol = null;
       resizingRow = null;
       document.body.style.userSelect = '';

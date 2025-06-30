@@ -3,6 +3,41 @@
  */
 class GridData {
   /**
+   * Inserts a new row at the specified index.
+   * @param {number} rowIndex The index at which to insert the row.
+   */
+  insertRow(rowIndex) {
+    const newData = new Map();
+    for (const [key, value] of this.data.entries()) {
+      const [r, c] = key.split(',').map(Number);
+      if (r >= rowIndex) {
+        newData.set(`${r + 1},${c}`, value);
+      } else {
+        newData.set(key, value);
+      }
+    }
+    this.data = newData;
+    this.rows++;
+  }
+
+  /**
+   * Inserts a new column at the specified index.
+   * @param {number} colIndex The index at which to insert the column.
+   */
+  insertCol(colIndex) {
+    const newData = new Map();
+    for (const [key, value] of this.data.entries()) {
+      const [r, c] = key.split(',').map(Number);
+      if (c >= colIndex) {
+        newData.set(`${r},${c + 1}`, value);
+      } else {
+        newData.set(key, value);
+      }
+    }
+    this.data = newData;
+    this.cols++;
+  }
+  /**
    * Initializes the GridData object.
    * @param {number} rows The number of rows in the grid.
    * @param {number} cols The number of columns in the grid.
@@ -35,6 +70,14 @@ class GridData {
   setCell(r, c, value) {
     if (value) this.data.set(`${r},${c}`, value);
     else this.data.delete(`${r},${c}`);
+  }
+
+  /**
+   * Clears the grid data.
+   */
+  clear() {
+    // Remove all data from the grid
+    this.data.clear();
   }
 }
 
