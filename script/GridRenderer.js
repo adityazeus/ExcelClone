@@ -13,7 +13,7 @@ class GridRenderer {
    */
   constructor(
     canvas, grid, selection, cellWidth, cellHeight, colWidths, rowHeights,
-    rowHeader, colHeader,onScroll, updateEditorPosition, gridCell,
+    rowHeader, colHeader, onScroll, updateEditorPosition, gridCell,
     onColResizeEnd, onRowResizeEnd
   ) {
     /** @type {HTMLCanvasElement} The canvas element for rendering. */
@@ -49,6 +49,9 @@ class GridRenderer {
     this.onColResizeEnd = onColResizeEnd;
     this.onRowResizeEnd = onRowResizeEnd;
     this.autoScrollInterval = null;
+    this.isMouseDown = false;
+    this.lastMouseX = null;
+    this.lastMouseY = null;
     this.autoScrollEdgeSize = 30; // px from edge to trigger auto-scroll
     this.autoScrollSpeed = 30;    // px per interval
     this.attachScroll();
@@ -123,6 +126,7 @@ class GridRenderer {
     this.scrollStartX = 0;
 
     this.hThumb.addEventListener('mousedown', (e) => {
+      this.isMouseDown = true;
       this.dragging = true;
       this.dragStartX = e.clientX;
       this.scrollStartX = this.scrollX;
@@ -130,6 +134,8 @@ class GridRenderer {
     });
 
     window.addEventListener('mousemove', (e) => {
+      this.lastMouseX = e.clientX;
+      this.lastMouseY = e.clientY;
       if (this.dragging) {
         const dx = e.clientX - this.dragStartX;
         const trackWidth = this.hScrollbar.offsetWidth - this.hThumb.offsetWidth;
@@ -150,6 +156,7 @@ class GridRenderer {
     });
 
     window.addEventListener('mouseup', () => {
+      this.isMouseDown = false;
       this.dragging = false;
       this.vDragging = false;
       document.body.style.userSelect = '';
@@ -175,6 +182,7 @@ class GridRenderer {
     this.vScrollStartY = 0;
 
     this.vThumb.addEventListener('mousedown', (e) => {
+      this.isMouseDown = true;
       this.vDragging = true;
       this.vDragStartY = e.clientY;
       this.vScrollStartY = this.scrollY;
@@ -408,10 +416,10 @@ class GridRenderer {
       // Top and right borders
       ctx.strokeStyle = "#ccc";
       ctx.beginPath();
-      ctx.moveTo(cx, 0);
-      ctx.lineTo(cx + colWidth, 0); // top
-      ctx.moveTo(cx + colWidth, 0);
-      ctx.lineTo(cx + colWidth, this.colHeader); // right
+      ctx.moveTo(cx, 0.5);
+      ctx.lineTo(cx + colWidth, 0.5); // top
+      ctx.moveTo(cx + colWidth - 0.5, 0);
+      ctx.lineTo(cx + colWidth - 0.5, this.colHeader); // right
       ctx.stroke();
 
       // Center align column header text, white & bold if selected
@@ -420,6 +428,8 @@ class GridRenderer {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(this.colToName(c), cx + colWidth / 2, this.colHeader / 2);
+
+
 
       cx += colWidth;
     }
@@ -568,11 +578,12 @@ class GridRenderer {
 
       // Top and right borders
       ctx.strokeStyle = "#ccc";
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(0, ry);
-      ctx.lineTo(this.rowHeader, ry); // top
-      ctx.moveTo(this.rowHeader, ry);
-      ctx.lineTo(this.rowHeader, ry + rowHeight); // right
+      ctx.moveTo(0, ry + 0.5);
+      ctx.lineTo(this.rowHeader, ry + 0.5); // top
+      ctx.moveTo(this.rowHeader - 0.5, ry);
+      ctx.lineTo(this.rowHeader - 0.5, ry + rowHeight); // right
       ctx.stroke();
 
       // Right align row header text, white & bold if selected
@@ -581,7 +592,6 @@ class GridRenderer {
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillText(r + 1, this.rowHeader - 5, ry + rowHeight / 2);
-
       ry += rowHeight;
     }
   }
@@ -650,11 +660,11 @@ class GridRenderer {
         // Cell Borders
         ctx.strokeStyle = "#ccc";
         ctx.beginPath();
-        ctx.lineWidth = 0.0;
-        ctx.moveTo(cx, ry);
-        ctx.lineTo(cx + colWidth, ry); // top
-        ctx.moveTo(cx + colWidth, ry);
-        ctx.lineTo(cx + colWidth, ry + rowHeight); // right
+        ctx.lineWidth = 1;
+        ctx.moveTo(cx, ry + 0.5); // top border at y=ry+0.5
+        ctx.lineTo(cx + colWidth, ry + 0.5); // top
+        ctx.moveTo(cx + colWidth - 0.5, ry);
+        ctx.lineTo(cx + colWidth - 0.5, ry + rowHeight); // right
         ctx.stroke();
 
         // Draw selection
@@ -773,7 +783,10 @@ class GridRenderer {
    * @returns {?{row: number, col: number}} The cell indices or null if out of bounds.
    */
   getCellAt(x, y) {
-    if (x < this.rowHeader || y < this.colHeader) return null;
+    // Clamp x/y to be at least at the start of the grid
+    x = Math.max(this.rowHeader, x);
+    y = Math.max(this.colHeader, y);
+
     let cx = this.rowHeader, col = 0;
     x += this.scrollX;
     while (col < this.colWidths.length && cx + this.colWidths[col] <= x) {
@@ -786,7 +799,9 @@ class GridRenderer {
       ry += this.rowHeights[row];
       row++;
     }
-    if (row >= this.grid.rows || col >= this.grid.cols) return null;
+    // Clamp to last valid cell
+    row = Math.max(0, Math.min(row, this.grid.rows - 1));
+    col = Math.max(0, Math.min(col, this.grid.cols - 1));
     return { row, col };
   }
 
@@ -796,6 +811,8 @@ class GridRenderer {
   attachResizeEvents() {
     let resizingCol = null, resizingRow = null, startX = 0, startY = 0, startWidth = 0, startHeight = 0;
     this.canvas.addEventListener('mousemove', (e) => {
+      this.lastMouseX = e.clientX;
+      this.lastMouseY = e.clientY;
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -811,6 +828,7 @@ class GridRenderer {
     });
 
     this.canvas.addEventListener('mousedown', (e) => {
+      this.isMouseDown = true;
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -840,6 +858,8 @@ class GridRenderer {
     });
 
     window.addEventListener('mousemove', (e) => {
+      this.lastMouseX = e.clientX;
+      this.lastMouseY = e.clientY;
       if (resizingCol !== null) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -866,10 +886,10 @@ class GridRenderer {
       if (this.autoScrollInterval) clearInterval(this.autoScrollInterval);
 
       let scrollX = 0, scrollY = 0;
-      if (x > this.canvas.width - this.autoScrollEdgeSize) scrollX = this.autoScrollSpeed;
-      else if (x < this.autoScrollEdgeSize) scrollX = -this.autoScrollSpeed;
-      if (y > this.canvas.height - this.autoScrollEdgeSize) scrollY = this.autoScrollSpeed;
-      else if (y < this.autoScrollEdgeSize) scrollY = -this.autoScrollSpeed;
+      if (x > this.canvas.width - this.autoScrollEdgeSize && this.isMouseDown) scrollX = this.autoScrollSpeed;
+      else if (x < this.autoScrollEdgeSize && this.isMouseDown) scrollX = -this.autoScrollSpeed;
+      if (y > this.canvas.height - this.autoScrollEdgeSize && this.isMouseDown) scrollY = this.autoScrollSpeed;
+      else if (y < this.autoScrollEdgeSize && this.isMouseDown) scrollY = -this.autoScrollSpeed;
 
       if (scrollX !== 0 || scrollY !== 0) {
         this.autoScrollInterval = setInterval(() => {
@@ -880,13 +900,53 @@ class GridRenderer {
             this.scrollY = Math.max(0, Math.min(this.scrollY + scrollY, this.maxScrollY()));
           }
           this.updateScrollbar && this.updateScrollbar();
+
+          // --- Update selection during auto-scroll ---
+          if (this.lastMouseX !== null && this.lastMouseY !== null) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = this.lastMouseX - rect.left;
+            const y = this.lastMouseY - rect.top;
+
+            // For multi-cell selection
+            if (this.multiCellSelection && this.multiCellSelection.isSelectingCells) {
+              const cell = this.getCellAt(x, y);
+              if (cell) {
+                this.multiCellSelection.endCell = cell;
+              }
+            }
+
+            // For row selection
+            if (this.isSelectingRows) {
+              const cell = this.getCellAt(this.rowHeader + 1, y);
+              if (cell) {
+                let from = Math.min(this.startRow, cell.row);
+                let to = Math.max(this.startRow, cell.row);
+                let rows = [];
+                for (let r = from; r <= to; r++) rows.push(r);
+                this.selection.setRows(rows);
+              }
+            }
+
+            // For column selection
+            if (this.isSelectingCols) {
+              const cell = this.getCellAt(x, this.colHeader + 1);
+              if (cell) {
+                let from = Math.min(this.startCol, cell.col);
+                let to = Math.max(this.startCol, cell.col);
+                let cols = [];
+                for (let c = from; c <= to; c++) cols.push(c);
+                this.selection.setCols(cols);
+              }
+            }
+          }
+
           this.render();
-          // Optionally, update selection here if needed
         }, 50);
       }
     });
 
     window.addEventListener('mouseup', () => {
+      this.isMouseDown = false;
       // When resizing a column ends (e.g., on mouseup after drag):
       if (this.isResizingCol) {
         const col = this.resizingColIndex;
